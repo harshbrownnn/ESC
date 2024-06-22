@@ -56,6 +56,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // Clear previous suggestions
         resultBox.innerHTML = '';
 
+        // Start timer before displaying dropdown
+        const startTime = performance.now();
+
         // Display filtered suggestions in dropdown
         const ul = document.createElement('ul');
         suggestions.forEach(suggestion => {
@@ -71,6 +74,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         resultBox.appendChild(ul);
 
+        // End timer after displaying dropdown
+        const endTime = performance.now();
+        const duration = endTime - startTime;
+        console.log(`Dropdown displayed in ${duration.toFixed(2)} ms`);
+
         // Show dropdown
         resultBox.style.display = 'block';
     }
@@ -80,8 +88,21 @@ document.addEventListener('DOMContentLoaded', function() {
         resultBox.style.display = 'none';
     }
 
-    // Event listener for keyup on input box
-    inputBox.addEventListener('keyup', function(event) {
+    // Debounce function
+    function debounce(func, delay) {
+        let timer;
+        return function() {
+            const context = this;
+            const args = arguments;
+            clearTimeout(timer);
+            timer = setTimeout(() => {
+                func.apply(context, args);
+            }, delay);
+        };
+    }
+
+    // Event listener for keyup on input box (with debounce)
+    inputBox.addEventListener('keyup', debounce(function(event) {
         const query = event.target.value.trim();
         const suggestions = filterSuggestions(query); // Filter suggestions based on current input
 
@@ -90,7 +111,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             hideSuggestionsDropdown(); // Hide dropdown if no suggestions
         }
-    });
+    }, 300)); // Adjust delay as needed (e.g., 300 milliseconds)
 
     // Event listener for click outside of dropdown to hide it
     document.addEventListener('click', function(event) {
