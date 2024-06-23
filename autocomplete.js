@@ -1,7 +1,6 @@
 document.addEventListener('DOMContentLoaded', function() {
     const inputBox = document.getElementById('input-box');
-    const resultBox = document.querySelector('.result-box');
-    const searchIcon = document.querySelector('.fa-solid'); // Magnifying glass icon
+    const resultBox = document.getElementById('result-box');
     let locations = []; // Array to store all locations
     let fuse; // Fuzzy search instance
 
@@ -10,31 +9,44 @@ document.addEventListener('DOMContentLoaded', function() {
         const options = {
             keys: ['term'],
             includeScore: true,
-            threshold: 0.6, // Lower threshold for more tolerance to typos
-            distance: 100, // Increase distance for more leniency in string matching
-            minMatchCharLength: 2, // Minimum character length to start searching
-            findAllMatches: true, // Find all matches, not just the best one
-            ignoreLocation: true // Ignore where the matches are in the strings
+            threshold: 0.4,
+            location: 0,
+            distance: 100,
+            maxPatternLength: 32,
+            minMatchCharLength: 1,
         };
         fuse = new Fuse(data, options);
     }
 
+    // Function to fetch data from GitHub hosted JSON file
+    async function fetchData() {
+        try {
+            const response = await fetch('https://cdn.jsdelivr.net/gh/elankumuthan/ESC@master/destinations.json');
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            const data = await response.json();
+            locations = data; // Store JSON data in the locations array
+            initializeFuse(locations); // Initialize fuse with locations data
+            console.log('Locations loaded:', locations); // Optional: Log loaded locations for debugging
+        } catch (error) {
+            console.error('Error fetching the locations:', error);
+        }
+    }
+
     // Function to filter suggestions based on user input using fuzzy search
     function filterSuggestions(query) {
-        if (!query || !fuse) {
+        if (!query.trim()) {
             return [];
         }
 
         const results = fuse.search(query);
         const filteredResults = results.map(result => result.item);
 
-        // Reduce number of items displayed as match gets closer
+        // Limit number of suggestions based on query length
         let displayLimit = 5;
-        if (query.length >= 4) {
-            displayLimit = 3;
-        } else if (query.length >= 2) {
-            displayLimit = 4;
-        }
+
+        console.log('Filtered Results:', filteredResults); // Log filtered results for debugging
 
         return filteredResults.slice(0, displayLimit);
     }
@@ -44,11 +56,14 @@ document.addEventListener('DOMContentLoaded', function() {
         // Clear previous suggestions
         resultBox.innerHTML = '';
 
+        // Start timer before displaying dropdown
+        const startTime = performance.now();
+
         // Display filtered suggestions in dropdown
         const ul = document.createElement('ul');
         suggestions.forEach(suggestion => {
             const li = document.createElement('li');
-            li.textContent = suggestion.term;
+            li.textContent = suggestion.term; // Display the 'term' property in suggestion
             li.setAttribute('data-uid', suggestion.uid); // Store the uid in a data attribute
             li.addEventListener('click', function() {
                 inputBox.value = suggestion.term; // Populate the input box with the suggestion term
@@ -59,6 +74,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         resultBox.appendChild(ul);
 
+        // End timer after displaying dropdown
+        const endTime = performance.now();
+        const duration = endTime - startTime;
+        console.log(`Dropdown displayed in ${duration.toFixed(2)} ms`);
+
         // Show dropdown
         resultBox.style.display = 'block';
     }
@@ -68,8 +88,21 @@ document.addEventListener('DOMContentLoaded', function() {
         resultBox.style.display = 'none';
     }
 
-    // Event listener for keyup on input box
-    inputBox.addEventListener('keyup', function(event) {
+    // Debounce function
+    function debounce(func, delay) {
+        let timer;
+        return function() {
+            const context = this;
+            const args = arguments;
+            clearTimeout(timer);
+            timer = setTimeout(() => {
+                func.apply(context, args);
+            }, delay);
+        };
+    }
+
+    // Event listener for keyup on input box (with debounce)
+    inputBox.addEventListener('keyup', debounce(function(event) {
         const query = event.target.value.trim();
         const suggestions = filterSuggestions(query); // Filter suggestions based on current input
 
@@ -78,7 +111,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             hideSuggestionsDropdown(); // Hide dropdown if no suggestions
         }
-    });
+    }, 300)); // Adjust delay as needed (e.g., 300 milliseconds)
 
     // Event listener for click outside of dropdown to hide it
     document.addEventListener('click', function(event) {
@@ -87,25 +120,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Event listener for click on the search icon
-    searchIcon.addEventListener('click', function() {
-        const query = inputBox.value.trim();
-        const suggestions = filterSuggestions(query);
-        if (suggestions.length > 0) {
-            const uid = suggestions[0].uid; // Assuming we take the first suggestion's uid
-            console.log('Selected UID:', uid);
-        } else {
-            console.log('No suggestions found for the current input.');
-        }
-    });
-
-    // Fetch JSON data and initialize fuse when data is loaded
-    fetch('destinations.json')
-        .then(response => response.json())
-        .then(data => {
-            locations = data; // Store JSON data in the locations array
-            initializeFuse(locations); // Initialize fuse with locations data
-            console.log('Locations loaded:', locations); // Optional: Log loaded locations for debugging
-        })
-        .catch(error => console.error('Error fetching the locations:', error));
+    // Fetch data initially when the document is loaded
+    fetchData();
 });
